@@ -14,7 +14,13 @@ app.get('/download', (req, res) => {
     return res.status(400).json({ error: 'Invalid YouTube video ID' });
   }
 
-  const videoUrl = `https://youtube.com{videoId}`;
+  // Assemble the full URL from pieces so it cannot be truncated
+  const proto = 'https://';
+  const host = 'youtube.com';
+  const query = '/watch?v=';
+  const videoUrl = proto + host + query + videoId;
+
+  console.log('Extracting full URL:', videoUrl);
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
   const args = [
