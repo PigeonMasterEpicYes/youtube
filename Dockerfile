@@ -1,13 +1,14 @@
 FROM node:20-slim
 
+# Install Python, pip, and FFmpeg
 RUN apt-get update && apt-get install -y \
     python3 \
-    curl \
+    python3-pip \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -L https://github.com -o /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp
+# Install verified yt-dlp directly via pip
+RUN pip3 install --no-cache-dir --break-system-packages -U yt-dlp
 
 WORKDIR /app
 COPY package*.json ./
