@@ -24,6 +24,7 @@ app.get('/download', (req, res) => {
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
   const args = [
+    '--js-runtimes', 'node',
     '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
     '--no-playlist',
