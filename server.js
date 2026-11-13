@@ -14,7 +14,6 @@ app.get('/download', (req, res) => {
     return res.status(400).json({ error: 'Invalid YouTube video ID' });
   }
 
-  // Assemble the full URL from pieces so it cannot be truncated
   const proto = 'https://';
   const host = 'youtube.com';
   const query = '/watch?v=';
@@ -32,8 +31,10 @@ app.get('/download', (req, res) => {
     videoUrl
   ];
 
+  // Automatically attach cookies.txt if it exists in the container
   const cookiesPath = path.join(__dirname, 'cookies.txt');
   if (fs.existsSync(cookiesPath)) {
+    console.log('Attaching cookies.txt to yt-dlp...');
     args.unshift('--cookies', cookiesPath);
   }
 
