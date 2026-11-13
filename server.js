@@ -18,16 +18,25 @@ app.get('/download', (req, res) => {
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
   const args = [
-    '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+    '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
+    '--no-playlist',
     '-o', tempFile,
     videoUrl
   ];
 
-  execFile('yt-dlp', args, (error) => {
+  const cookiesPath = path.join(__dirname, 'cookies.txt');
+  if (fs.existsSync(cookiesPath)) {
+    args.unshift('--cookies', cookiesPath);
+  }
+
+  execFile('yt-dlp', args, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
     if (error || !fs.existsSync(tempFile)) {
-      console.error('Extraction error:', error);
-      return res.status(500).json({ error: 'Failed to process video stream' });
+      console.error('yt-dlp stderr:', stderr);
+      return res.status(500).json({ 
+        error: 'Extraction failed', 
+        details: stderr || error.message 
+      });
     }
 
     res.download(tempFile, `${videoId}.mp4`, () => {
