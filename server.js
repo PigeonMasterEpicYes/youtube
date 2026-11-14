@@ -35,9 +35,9 @@ function runExtraction(videoId, res, done) {
 
   const args = [
     '--newline',
-    '--sleep-requests', '1.5',
+    '--no-write-cookies',
+    '--sleep-requests', '2',
     '--remote-components', 'ejs:github',
-    '--extractor-args', 'youtube:player_client=tv_simply,web',
     '-f', 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
     '--no-playlist',
     '-o', tempFile,
