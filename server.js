@@ -8,6 +8,13 @@ const os = require('os');
 const app = express();
 app.use(cors());
 
+// Start the local PO Token generator server on port 4416
+const potServer = spawn('node', ['/opt/pot-provider/server/build/main.js'], {
+  stdio: 'ignore',
+  detached: true
+});
+potServer.unref();
+
 let isProcessing = false;
 const queue = [];
 
@@ -27,32 +34,23 @@ function runExtraction(videoId, res, done) {
   target.searchParams.set('v', videoId);
   const videoUrl = target.toString();
 
-  console.log('Extracting full URL:', videoUrl);
+  console.log('Extracting full URL with PO Token:', videoUrl);
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Transfer-Encoding', 'chunked');
 
+  // Uses mweb client + automatic PO tokens from localhost:4416 (no cookies needed)
   const args = [
     '--newline',
     '--sleep-requests', '1.5',
     '--remote-components', 'ejs:github',
+    '--extractor-args', 'youtube:player_client=mweb',
     '-f', 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
     '--no-playlist',
     '-o', tempFile,
     videoUrl
   ];
-
-  // Copy cookies.txt to /tmp so yt-dlp never modifies the original file
-  const cookiesPath = path.join(__dirname, 'cookies.txt');
-  let tempCookiesPath = null;
-
-  if (fs.existsSync(cookiesPath)) {
-    tempCookiesPath = path.join(os.tmpdir(), `cookies-${Date.now()}.txt`);
-    fs.copyFileSync(cookiesPath, tempCookiesPath);
-    console.log('Attaching temporary cookies copy to yt-dlp...');
-    args.unshift('--cookies', tempCookiesPath);
-  }
 
   const child = spawn('yt-dlp', args);
 
@@ -68,10 +66,6 @@ function runExtraction(videoId, res, done) {
   });
 
   child.on('close', (code) => {
-    if (tempCookiesPath) {
-      fs.unlink(tempCookiesPath, () => {});
-    }
-
     if (code !== 0 || !fs.existsSync(tempFile)) {
       res.write(JSON.stringify({ type: 'error', error: 'Extraction failed' }) + '\n');
       res.end();
