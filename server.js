@@ -8,12 +8,14 @@ const os = require('os');
 const app = express();
 app.use(cors());
 
-// Start the local PO Token generator server on port 4416
-const potServer = spawn('node', ['/opt/pot-provider/server/build/main.js'], {
-  stdio: 'ignore',
-  detached: true
+// Start the local PO Token generator server on port 4416 and log its output
+const potServer = spawn('node', ['/opt/pot-provider/build/main.js'], {
+  stdio: 'inherit'
 });
-potServer.unref();
+
+potServer.on('error', (err) => {
+  console.error('Failed to start PO Token server:', err);
+});
 
 let isProcessing = false;
 const queue = [];
@@ -40,12 +42,11 @@ function runExtraction(videoId, res, done) {
   res.setHeader('Content-Type', 'application/x-ndjson');
   res.setHeader('Transfer-Encoding', 'chunked');
 
-  // Uses mweb client + automatic PO tokens from localhost:4416 (no cookies needed)
   const args = [
     '--newline',
     '--sleep-requests', '1.5',
     '--remote-components', 'ejs:github',
-    '--extractor-args', 'youtube:player_client=mweb',
+    '--extractor-args', 'youtube:player_client=tv_simply,mweb',
     '-f', 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
     '--no-playlist',
     '-o', tempFile,
