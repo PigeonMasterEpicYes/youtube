@@ -24,6 +24,8 @@ app.get('/download', (req, res) => {
 
   const args = [
     '--js-runtimes', 'node',
+    '--remote-components', 'ejs:github',
+    '--extractor-args', 'youtube:player_client=tv,web',
     '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
     '--no-playlist',
@@ -31,7 +33,6 @@ app.get('/download', (req, res) => {
     videoUrl
   ];
 
-  // Automatically attach cookies.txt if it exists in the container
   const cookiesPath = path.join(__dirname, 'cookies.txt');
   if (fs.existsSync(cookiesPath)) {
     console.log('Attaching cookies.txt to yt-dlp...');
