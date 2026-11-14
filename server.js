@@ -35,13 +35,15 @@ function runExtraction(videoId, res, done) {
 
   const args = [
     '--newline',
+    '--sleep-requests', '1.5',
     '--remote-components', 'ejs:github',
-    '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
-    '--merge-output-format', 'mp4',
+    '--extractor-args', 'youtube:player_client=tv_simply,web',
+    '-f', 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
     '--no-playlist',
     '-o', tempFile,
     videoUrl
   ];
+
 
   const cookiesPath = path.join(__dirname, 'cookies.txt');
   if (fs.existsSync(cookiesPath)) {
