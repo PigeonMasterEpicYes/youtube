@@ -1,19 +1,18 @@
+FROM denoland/deno:bin AS deno
 FROM node:20-slim
 
-# Install Python, pip, curl, unzip, and FFmpeg
+# Copy pre-built Deno binary cleanly
+COPY --from=deno /deno /usr/local/bin/deno
+
+# Install Python, pip, and FFmpeg
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
-    curl \
-    unzip \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Deno (yt-dlp's default JS runtime for n-challenge solving)
-RUN curl -fsSL https://deno.land | DENO_INSTALL=/usr/local sh
-
-# Install yt-dlp with [default] extras + automatic PO Token generator plugin
-RUN pip3 install --no-cache-dir --break-system-packages -U "yt-dlp[default]" bgutil-ytdlp-pot-provider
+# Install yt-dlp with [default] extras (includes yt-dlp-ejs solver)
+RUN pip3 install --no-cache-dir --break-system-packages -U "yt-dlp[default]"
 
 WORKDIR /app
 COPY package*.json ./
