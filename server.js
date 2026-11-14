@@ -8,7 +8,6 @@ const os = require('os');
 const app = express();
 app.use(cors());
 
-// One-at-a-time download queue to stay within Render's 512 MB RAM limit
 let isProcessing = false;
 const queue = [];
 
@@ -24,7 +23,6 @@ function processQueue() {
 }
 
 function runExtraction(videoId, res, done) {
-  // Build target URL safely using URL object so slashes never duplicate
   const target = new URL('/watch', 'https://youtube.com');
   target.searchParams.set('v', videoId);
   const videoUrl = target.toString();
@@ -33,9 +31,7 @@ function runExtraction(videoId, res, done) {
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
   const args = [
-    '--js-runtimes', 'node',
     '--remote-components', 'ejs:github',
-    '--extractor-args', 'youtube:player_client=mweb,tv',
     '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
     '--no-playlist',
