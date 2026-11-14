@@ -35,8 +35,7 @@ function runExtraction(videoId, res, done) {
 
   const args = [
     '--newline',
-    '--no-write-cookies',
-    '--sleep-requests', '2',
+    '--sleep-requests', '1.5',
     '--remote-components', 'ejs:github',
     '-f', 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
     '--no-playlist',
@@ -44,11 +43,15 @@ function runExtraction(videoId, res, done) {
     videoUrl
   ];
 
-
+  // Copy cookies.txt to /tmp so yt-dlp never modifies the original file
   const cookiesPath = path.join(__dirname, 'cookies.txt');
+  let tempCookiesPath = null;
+
   if (fs.existsSync(cookiesPath)) {
-    console.log('Attaching cookies.txt to yt-dlp...');
-    args.unshift('--cookies', cookiesPath);
+    tempCookiesPath = path.join(os.tmpdir(), `cookies-${Date.now()}.txt`);
+    fs.copyFileSync(cookiesPath, tempCookiesPath);
+    console.log('Attaching temporary cookies copy to yt-dlp...');
+    args.unshift('--cookies', tempCookiesPath);
   }
 
   const child = spawn('yt-dlp', args);
@@ -65,6 +68,10 @@ function runExtraction(videoId, res, done) {
   });
 
   child.on('close', (code) => {
+    if (tempCookiesPath) {
+      fs.unlink(tempCookiesPath, () => {});
+    }
+
     if (code !== 0 || !fs.existsSync(tempFile)) {
       res.write(JSON.stringify({ type: 'error', error: 'Extraction failed' }) + '\n');
       res.end();
