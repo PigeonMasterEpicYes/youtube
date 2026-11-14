@@ -8,16 +8,26 @@ const os = require('os');
 const app = express();
 app.use(cors());
 
-app.get('/download', (req, res) => {
-  const videoId = req.query.id;
-  if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-    return res.status(400).json({ error: 'Invalid YouTube video ID' });
-  }
+// One-at-a-time download queue to stay within Render's 512 MB RAM limit
+let isProcessing = false;
+const queue = [];
 
-  const proto = 'https://';
-  const host = 'youtube.com';
-  const query = '/watch?v=';
-  const videoUrl = proto + host + query + videoId;
+function processQueue() {
+  if (isProcessing || queue.length === 0) return;
+  isProcessing = true;
+
+  const { videoId, res } = queue.shift();
+  runExtraction(videoId, res, () => {
+    isProcessing = false;
+    processQueue();
+  });
+}
+
+function runExtraction(videoId, res, done) {
+  // Build target URL safely using URL object so slashes never duplicate
+  const target = new URL('/watch', 'https://youtube.com');
+  target.searchParams.set('v', videoId);
+  const videoUrl = target.toString();
 
   console.log('Extracting full URL:', videoUrl);
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
@@ -25,7 +35,7 @@ app.get('/download', (req, res) => {
   const args = [
     '--js-runtimes', 'node',
     '--remote-components', 'ejs:github',
-    '--extractor-args', 'youtube:player_client=tv,web',
+    '--extractor-args', 'youtube:player_client=mweb,tv',
     '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
     '--no-playlist',
@@ -42,16 +52,28 @@ app.get('/download', (req, res) => {
   execFile('yt-dlp', args, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
     if (error || !fs.existsSync(tempFile)) {
       console.error('yt-dlp stderr:', stderr);
-      return res.status(500).json({ 
-        error: 'Extraction failed', 
-        details: stderr || error.message 
+      res.status(500).json({
+        error: 'Extraction failed',
+        details: stderr || error.message
       });
+      return done();
     }
 
     res.download(tempFile, `${videoId}.mp4`, () => {
       fs.unlink(tempFile, () => {});
+      done();
     });
   });
+}
+
+app.get('/download', (req, res) => {
+  const videoId = req.query.id;
+  if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+    return res.status(400).json({ error: 'Invalid YouTube video ID' });
+  }
+
+  queue.push({ videoId, res });
+  processQueue();
 });
 
 const PORT = process.env.PORT || 3000;
