@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { execFile } = require('child_process');
+const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -30,7 +30,11 @@ function runExtraction(videoId, res, done) {
   console.log('Extracting full URL:', videoUrl);
   const tempFile = path.join(os.tmpdir(), `${videoId}-${Date.now()}.mp4`);
 
+  res.setHeader('Content-Type', 'application/x-ndjson');
+  res.setHeader('Transfer-Encoding', 'chunked');
+
   const args = [
+    '--newline',
     '--remote-components', 'ejs:github',
     '-f', 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
     '--merge-output-format', 'mp4',
@@ -45,20 +49,32 @@ function runExtraction(videoId, res, done) {
     args.unshift('--cookies', cookiesPath);
   }
 
-  execFile('yt-dlp', args, { maxBuffer: 1024 * 1024 * 50 }, (error, stdout, stderr) => {
-    if (error || !fs.existsSync(tempFile)) {
-      console.error('yt-dlp stderr:', stderr);
-      res.status(500).json({
-        error: 'Extraction failed',
-        details: stderr || error.message
-      });
+  const child = spawn('yt-dlp', args);
+
+  child.stdout.on('data', (chunk) => {
+    const line = chunk.toString().trim();
+    if (line.includes('[download]') || line.includes('[Merger]')) {
+      res.write(JSON.stringify({ type: 'progress', text: line }) + '\n');
+    }
+  });
+
+  child.stderr.on('data', (chunk) => {
+    console.error('yt-dlp stderr:', chunk.toString());
+  });
+
+  child.on('close', (code) => {
+    if (code !== 0 || !fs.existsSync(tempFile)) {
+      res.write(JSON.stringify({ type: 'error', error: 'Extraction failed' }) + '\n');
+      res.end();
       return done();
     }
 
-    res.download(tempFile, `${videoId}.mp4`, () => {
-      fs.unlink(tempFile, () => {});
-      done();
-    });
+    const base64Video = fs.readFileSync(tempFile).toString('base64');
+    res.write(JSON.stringify({ type: 'complete', base64: base64Video }) + '\n');
+    res.end();
+
+    fs.unlink(tempFile, () => {});
+    done();
   });
 }
 
